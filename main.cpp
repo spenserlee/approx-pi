@@ -3,6 +3,7 @@
 #include <math.h>
 // #include <sys/ipc.h>
 // #include <sys/sem.h>
+#include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <string>
@@ -11,9 +12,9 @@
 #include <limits>
 
 #define PATH_MAX 255
-#define NUM_WORKERS 5
+#define NUM_WORKERS 8
 #define ITERATIONS 1000000000L
-#define ACTUAL_PI "3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821"
+#define ACTUAL_PI "3.14159265358979323846"
 
 /*
 It is understood that using the Taylor series to approximate pi is very slow,
@@ -83,6 +84,22 @@ void do_work(unsigned long long  start, unsigned long long  num_iterations)
     *global_result += seriesResult;
 }
 
+timespec diff(timespec start, timespec end)
+{
+    timespec temp;
+    if ((end.tv_nsec-start.tv_nsec) < 0)
+    {
+        temp.tv_sec = end.tv_sec-start.tv_sec - 1;
+        temp.tv_nsec = 1000000000 + end.tv_nsec-start.tv_nsec;
+    }
+    else
+    {
+        temp.tv_sec = end.tv_sec-start.tv_sec;
+        temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return temp;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -121,6 +138,11 @@ int main(int argc, char **argv)
 
     semid = semget(key, NUM_WORKERS, 0666 | IPC_CREAT);
     */
+
+    timespec start;
+    timespec finish;
+
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
 
     double iterations_per_worker = floor(ITERATIONS / NUM_WORKERS);
     unsigned long long  remaining_iterations = ITERATIONS - (iterations_per_worker * NUM_WORKERS);
@@ -169,10 +191,14 @@ int main(int argc, char **argv)
 
     approx_pi = 4 * (1 + *global_result);
 
-    serial_test();
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &finish);
+
+    // serial_test();
     std::cout << std::endl
     << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::digits10 + 2) << approx_pi << std::endl;
     std::cout << "actual  pi = " << ACTUAL_PI << std::endl;
+
+    std::cout << "elapsed time: " << diff(start,finish).tv_nsec << " ns" << std::endl;
 
     // TODO: check for failure
     munmap(global_result, sizeof *global_result);
