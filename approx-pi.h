@@ -54,9 +54,20 @@ http://www.geom.uiuc.edu/~huberty/math5337/groupe/expresspi.html?
     // pi       = 4 * z
 static long double *global_result;
 
-void serial_test(unsigned long long iterations);
+void approx_pi_t(
+    unsigned long long start,
+    unsigned long long num_iters,
+    unsigned long long total_iters,
+    bool output,
+    int process,
+    int thread
+    );
 
-void approx_pi_t(unsigned long long start, unsigned long long num_iterations, bool output, int process, int thread);
-
-void approx_pi(unsigned long long start, unsigned long long num_iterations, bool output, int process);
+void approx_pi(
+    unsigned long long start,
+    unsigned long long num_iters,
+    unsigned long long total_iters,
+    bool output,
+    int process
+    );
 

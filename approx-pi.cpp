@@ -71,7 +71,7 @@ int main(int argc, char **argv)
             {
                 for (int j = 0; j < arguments.threads; j++)
                 {
-                    threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, output, i, j);
+                    threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, num_iters, output, i, j);
                     t_count++;
                     start_iteration += iters_per_worker;
                 }
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                approx_pi(start_iteration, iters_per_worker, output, i);
+                approx_pi(start_iteration, iters_per_worker, num_iters, output, i);
             }
             return 0;
         }
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
                 num_iters = iters_per_worker;
             }
 
-            threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, output, num_processes-1, i);
+            threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, num_iters, output, num_processes-1, i);
             t_count++;
 
             start_iteration += iters_per_worker;
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        approx_pi(start_iteration, iters_per_worker + remaining_iterations, output, num_processes-1);
+        approx_pi(start_iteration, iters_per_worker + remaining_iterations, num_iters, output, num_processes-1);
     }
     sem_close(mysem);
 
@@ -183,30 +183,13 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void serial_test(unsigned long long iterations)
-{
-
-    long double seriesResult = 0.0;
-    long double denominator = 3.0;
-    long double approx_pi = 0.0;
-    char sign = -1;
-
-    for (unsigned long long i = 0; i < iterations; i++)
-    {
-        seriesResult = seriesResult + (sign * (1.0 / denominator));
-        denominator += 2.0;
-        sign *= -1;
-    }
-
-    std::cout << std::setprecision(std::numeric_limits<long double>::max_digits10)
-     << std::endl << "ssResult  = " << seriesResult << std::endl;
-
-    approx_pi = 4 * (1 + seriesResult);
-
-    std::cout << "sapprox pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi << std::endl;
-}
-
-void approx_pi_t(unsigned long long start, unsigned long long num_iterations, bool output, int process, int thread)
+void approx_pi_t(
+    unsigned long long start,
+    unsigned long long num_iters,
+    unsigned long long total_iters,
+    bool output,
+    int process,
+    int thread)
 {
     char sign = (start % 2 == 0) ? -1 : 1;
     long double denominator = 3.0 + (2 * start);
@@ -219,12 +202,21 @@ void approx_pi_t(unsigned long long start, unsigned long long num_iterations, bo
         file.open(file_name);
     }
 
-    for (unsigned long long  i = 0; i < num_iterations; i++)
+    for (unsigned long long i = 0; i < num_iters; i++)
     {
         seriesResult = seriesResult + (sign * (1.0 / denominator));
         if (output)
         {
-            file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+            if (total_iters > 100000000)    // safeguard to prevent huge output file size
+            {
+                if (i % 10000 == 0)
+                {
+                   file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+                }
+            }
+            else {
+                file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+            }
         }
         denominator += 2.0;
         sign *= -1;
@@ -235,7 +227,8 @@ void approx_pi_t(unsigned long long start, unsigned long long num_iterations, bo
     }
 
     sem_t *semdes;
-    if ((semdes = sem_open(SEMAPHORE_NAME, 0, 0644, 0)) == (void*) -1)
+    if ((semdes = sem_open(SEMAPHORE_NAME,
+        0, 0644, 0)) == (void*) -1)
     {
         std::cout << "sem_open() in work failed" << std::endl;
     }
@@ -248,7 +241,12 @@ void approx_pi_t(unsigned long long start, unsigned long long num_iterations, bo
     }
 }
 
-void approx_pi(unsigned long long start, unsigned long long num_iterations, bool output, int process)
+void approx_pi(
+    unsigned long long start,
+    unsigned long long num_iters,
+    unsigned long long total_iters,
+    bool output,
+    int process)
 {
     char sign = (start % 2 == 0) ? -1 : 1;
     long double denominator = 3.0 + (2 * start);
@@ -261,12 +259,21 @@ void approx_pi(unsigned long long start, unsigned long long num_iterations, bool
         file.open(file_name);
     }
 
-    for (unsigned long long  i = 0; i < num_iterations; i++)
+    for (unsigned long long i = 0; i < num_iters; i++)
     {
         seriesResult = seriesResult + (sign * (1.0 / denominator));
         if (output)
         {
-            file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+            if (total_iters > 100000000)    // safeguard to prevent huge output file size
+            {
+                if (i % 10000 == 0)
+                {
+                   file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+                }
+            }
+            else {
+                file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+            }
         }
         denominator += 2.0;
         sign *= -1;
@@ -277,7 +284,8 @@ void approx_pi(unsigned long long start, unsigned long long num_iterations, bool
     }
 
     sem_t *semdes;
-    if ((semdes = sem_open(SEMAPHORE_NAME, 0, 0644, 0)) == (void*) -1)
+    if ((semdes = sem_open(SEMAPHORE_NAME,
+        0, 0644, 0)) == (void*) -1)
     {
         std::cout << "sem_open() in work failed" << std::endl;
     }
