@@ -23,6 +23,10 @@
 -- This program's primary objective is to act as a busy-work task as a benchmark for comparing the performance
 -- of threads and processes.
 --
+-- NOTE:
+-- as the number of discrete workers increase, there is a loss of precision (last 3 decimals)
+-- due to the addition done on the global_result variable.
+--
 -- The forumla used to approximate Pi is the Taylor series. It is understood that using the Taylor series to
 -- approximate pi is very inefficient. For more information on the Taylor series to calculate Pi see:
 -- https://www.math.hmc.edu/funfacts/ffiles/30001.1-3.shtml
@@ -160,7 +164,8 @@ int main(int argc, char **argv)
     }
 
     // parent process does last set of iterations
-    if (arguments.threads > 0)
+
+    if (arguments.threads > 0)  // using threads
     {
         for (int i = 0; i < arguments.threads; i++)
         {
@@ -184,7 +189,7 @@ int main(int argc, char **argv)
             threads[i].join();
         }
     }
-    else
+    else    // using processes
     {
         approx_pi(start_iteration, iters_per_worker + remaining_iterations, num_iters, output, num_processes-1);
     }
@@ -210,13 +215,13 @@ int main(int argc, char **argv)
 
     std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
 
-    // NOTE:
-    // as the number of discrete workers increase, there is a loss of precision (last 3 decimals)
-    // due to the addition done on the global_result variable
-
-    std::cout
-    << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi_result << std::endl;
-    std::cout << "actual  pi = " << ACTUAL_PI << std::endl;
+    std::cout << "approx. pi = "
+              << std::setprecision(std::numeric_limits<long double>::max_digits10)
+              << approx_pi_result
+              << std::endl;
+    std::cout << "actual  pi = "
+              << ACTUAL_PI
+              << std::endl;
 
     auto e_time = std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
 
