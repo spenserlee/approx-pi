@@ -34,7 +34,7 @@ static char args_doc[] = "NUM_ITERATIONS NUM_PROCESSES";
 static struct argp_option options[] =
 {
     {"threads",         't', "AMOUNT",      0,  "number of worker threads PER process"},
-    {"openmp",          'm', "AMOUNT",      0,  "number of threads using the Open MP library"},
+    // {"openmp",          'm', "AMOUNT",      0,  "number of threads using the Open MP library"},
     {"output",          'o', 0,             0,  "disable worker I/O operations"},
     { 0 }
 };
@@ -74,9 +74,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         case 't':
             arguments->threads = std::stoi(arg);
             break;
-        case 'm':
-            arguments->openmp = std::stoi(arg);
-            break;
+        // case 'm':
+        //     arguments->openmp = std::stoi(arg);
+        //     break;
         case 'o':
             arguments->output = 0;
             break;

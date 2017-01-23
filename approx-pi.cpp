@@ -99,6 +99,13 @@ int main(int argc, char **argv)
 
     bool output = (arguments.output == 1 ? true : false);
 
+    std::cout << "Total Iterations              = " << num_iters << std::endl
+              << "Total Workers                 = " << total_workers << std::endl
+              << "Iterations Per Worker         = " << iters_per_worker << std::endl
+              << "Process Workers               = " << num_processes << std::endl
+              << "Thread Workers Per Process    = " << arguments.threads << std::endl
+              << "File Output                   = " << output << std::endl << std::endl;
+
     if (output)
     {
         if (stat("./output", &st) == -1)
@@ -231,7 +238,7 @@ int main(int argc, char **argv)
     file << "elapsed time: " << e_time << " milliseconds\n";
     file.close();
 
-    std::cout << "elapsed time: " << e_time << " milliseconds" << std::endl;
+    std::cout << "\nelapsed time: " << e_time << " milliseconds" << std::endl;
 
     munmap(global_result, sizeof *global_result);
     sem_unlink(SEMAPHORE_NAME);
