@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <argp.h>
 #include <unistd.h>
 #include <math.h>
 // #include <sys/ipc.h>
@@ -11,9 +13,6 @@
 #include <iomanip>
 #include <limits>
 
-#define PATH_MAX 255
-#define NUM_WORKERS 8
-#define ITERATIONS 1000000000L
 #define ACTUAL_PI "3.14159265358979323846"
 
 /*
@@ -31,7 +30,7 @@ http://www.geom.uiuc.edu/~huberty/math5337/groupe/expresspi.html?
 static long double *global_result;
 
 
-void serial_test()
+void serial_test(unsigned long long iterations)
 {
 
     long double seriesResult = 0.0;
@@ -39,7 +38,7 @@ void serial_test()
     long double approx_pi = 0.0;
     char sign = -1;
 
-    for (unsigned long long i = 0; i < ITERATIONS; i++)
+    for (unsigned long long i = 0; i < iterations; i++)
     {
         seriesResult = seriesResult + (sign * (1.0 / denominator));
         denominator += 2.0;
@@ -100,9 +99,106 @@ timespec diff(timespec start, timespec end)
     return temp;
 }
 
+// argp globals
+const char *argp_program_version = "approx-pi 0.1";
+static char doc[] = "approx-pi -- a program to compare the performance between\
+                    processes and threads, where the busy-work task is to \
+                    approximate pi using the Taylor series.";
+
+// a description of the accepted arguments
+static char args_doc[] = "NUM_ITERATIONS NUM_PROCESSES";
+
+// the options understood by this program
+static struct argp_option options[] =
+{
+    {"threads",         't', "AMOUNT",      0,  "number of worker threads PER process"},
+    {"openmp",          'm', "AMOUNT",      0,  "number of threads using the Open MP library"},
+    {"output",          'o', 0,             0,  "disable worker I/O operations"},
+    { 0 }
+};
+
+struct arguments
+{
+    char *args[2];
+    int threads;
+    int openmp;
+    short output;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct arguments *arguments = (struct arguments *) state->input;
+
+    switch (key)
+    {
+        case 't':
+            arguments->threads = std::stoi(arg);
+            break;
+        case 'm':
+            arguments->openmp = std::stoi(arg);
+            break;
+        case 'o':
+            arguments->output = 0;
+            break;
+
+        case ARGP_KEY_ARG:
+            if (state->arg_num > 2)    // too many arguments
+            {
+                argp_usage(state);
+            }
+            arguments->args[state->arg_num] = arg;
+            break;
+
+        case ARGP_KEY_END:
+            if (state->arg_num < 2)     // not enough arguments
+            {
+                argp_usage(state);
+            }
+            if (arguments->threads )
+
+            break;
+
+        default:
+            return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
+
+// the argument parser
+static struct argp argp = { options, parse_opt, args_doc, doc };
 
 int main(int argc, char **argv)
 {
+
+    // int num_processes;
+    // int num_threads;
+
+    struct arguments arguments;
+
+    // default options
+    arguments.threads = 0;
+    arguments.openmp = 0;
+    arguments.output = 1;
+
+    // execute argument parser
+    argp_parse (&argp, argc, argv, 0, 0, &arguments);
+
+    // TODO: may not be necessary due to argp consuming - for negative args
+    if (std::stoull(arguments.args[0]) < 0 || std::stoi(arguments.args[1]) < 0) {
+        std::cout << "NUM_ITERATIONS and NUM_PROCESSES must be a positive value." << std::endl;
+        return -1;
+    }
+
+    unsigned long long num_iters = std::stoull(arguments.args[0]);
+    unsigned int num_processes = std::stoi(arguments.args[1]);
+
+    // printf ("NUM_ITERATIONS = %s\nNUM_PROCESSES = %s\nthreads = %d\nopenmp = %d\noutput = %s\n",
+    //         arguments.args[0],
+    //         arguments.args[1],
+    //         arguments.threads,
+    //         arguments.openmp,
+    //         arguments.output ? "yes" : "no");
+
     global_result = (long double*) mmap(NULL, sizeof *global_result, PROT_READ |
                                                 PROT_WRITE,
                                                 MAP_SHARED |
@@ -110,7 +206,7 @@ int main(int argc, char **argv)
                                                 -1, 0);
     *global_result = 0.0;
 
-    /*
+/*
     char buf[PATH_MAX];
     size_t len = ::readlink("/proc/self/exe", buf, sizeof(buf)-1);
 
@@ -137,31 +233,34 @@ int main(int argc, char **argv)
     }
 
     semid = semget(key, NUM_WORKERS, 0666 | IPC_CREAT);
-    */
+*/
 
     timespec start;
     timespec finish;
 
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
+    // if there are no threaded workers, total workers is just number of processes
+    // otherwise its is the product of threads per process
+    int total_workers = (arguments.threads == 0 ? num_processes : num_processes * arguments.threads);
+    double iters_per_worker = floor(num_iters / total_workers);
+    unsigned long long remaining_iterations = num_iters - (iters_per_worker * total_workers);
+    unsigned long long start_iteration = 0;
 
-    double iterations_per_worker = floor(ITERATIONS / NUM_WORKERS);
-    unsigned long long  remaining_iterations = ITERATIONS - (iterations_per_worker * NUM_WORKERS);
-    unsigned long long  start_iteration = 0;
+    pid_t* pids = new pid_t[total_workers-1];
 
-    pid_t* pids = new pid_t[NUM_WORKERS-1];
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
-    for (int i = 0; i < NUM_WORKERS - 1; i++)
+    for (int i = 0; i < total_workers - 1; i++)
     {
         pids[i] = fork();
 
         if (pids[i] == 0) // child
         {
-            do_work(start_iteration, iterations_per_worker);
+            do_work(start_iteration, iters_per_worker);
             return 0;
         }
         else if (pids[i] > 0) // parent
         {
-            start_iteration += iterations_per_worker;
+            start_iteration += iters_per_worker;
         }
         else
         {
@@ -171,11 +270,11 @@ int main(int argc, char **argv)
     }
 
     // parent process does last set of iterations
-    do_work(start_iteration, iterations_per_worker + remaining_iterations);
+    do_work(start_iteration, iters_per_worker + remaining_iterations);
 
     // force parent to wait for child processes to finish
     // error message if a child fails
-    for (int i = 0; i < NUM_WORKERS-1; i++)
+    for (int i = 0; i < total_workers-1; i++)
     {
         int status;
         while (-1 == waitpid(pids[i], &status, 0));
@@ -191,7 +290,7 @@ int main(int argc, char **argv)
 
     approx_pi = 4 * (1 + *global_result);
 
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &finish);
+    clock_gettime(CLOCK_MONOTONIC, &finish);
 
     // serial_test();
     std::cout << std::endl

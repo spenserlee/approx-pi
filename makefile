@@ -1,8 +1,8 @@
 # makefile
-CXX=g++ -Wall
+CXX=g++ -std=c++11 -Wall
 
 all:
-	$(CXX) -g -o a1 *.cpp
+	$(CXX) -g -o approx-pi *.cpp
 
 clean:
-	rm -f *.o core.* a1
+	rm -f *.o core.* approx-pi
