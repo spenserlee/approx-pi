@@ -1,3 +1,24 @@
+/*------------------------------------------------------------------------------------------------------------------
+-- SOURCE FILE: utils.h - This file contains utility functions for the main program.
+--
+-- PROGRAM: approx-pi
+--
+-- FUNCTIONS:
+--      parse_opt
+--
+-- DATE: January 23, 2017
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Spenser Lee
+--
+-- PROGRAMMER: Spenser Lee
+--
+-- NOTES:
+-- This file contains utility functions and definitions for the main program. Primarily it contains
+-- the definitions for the command line parsing library argp.
+----------------------------------------------------------------------------------------------------------------------*/
+
 #include <argp.h>
 
 // argp globals
@@ -26,6 +47,24 @@ struct arguments
     short output;
 };
 
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: parse_opt
+--
+-- DATE: January 23 2017
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Spenser Lee
+--
+-- PROGRAMMER: Spenser Lee
+--
+-- INTERFACE: parse_opt(int key, char *arg, struct argp_state *state)
+--
+-- RETURNS: error_t
+--
+-- NOTES:
+-- argp command line argument processor function.
+----------------------------------------------------------------------------------------------------------------------*/
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
     struct arguments *arguments = (struct arguments *) state->input;

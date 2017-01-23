@@ -1,5 +1,60 @@
+/*------------------------------------------------------------------------------------------------------------------
+-- SOURCE FILE: approx-pi.cpp - This file is the main program for calculating pi.
+--
+-- PROGRAM: approx-pi
+--
+-- FUNCTIONS:
+--      main
+--      approx_pi_t
+--      approx_pi
+--
+-- DATE: January 23, 2017
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Spenser Lee
+--
+-- PROGRAMMER: Spenser Lee
+--
+-- NOTES:
+-- This file contains the main program. It takes the command line input then creates a user specified number
+-- of worker processes and threads.
+--
+-- This program's primary objective is to act as a busy-work task as a benchmark for comparing the performance
+-- of threads and processes.
+--
+-- The forumla used to approximate Pi is the Taylor series. It is understood that using the Taylor series to
+-- approximate pi is very inefficient. For more information on the Taylor series to calculate Pi see:
+-- https://www.math.hmc.edu/funfacts/ffiles/30001.1-3.shtml
+-- http://www.geom.uiuc.edu/~huberty/math5337/groupe/expresspi.html?
+----------------------------------------------------------------------------------------------------------------------*/
+
 #include "approx-pi.h"
 
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: main
+--
+-- DATE: January 23 2017
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Spenser Lee
+--
+-- PROGRAMMER: Spenser Lee
+--
+-- INTERFACE: main(int argc, char **argv)
+--
+-- RETURNS: int
+--
+-- NOTES:
+-- Entry point of the program. After executing the argp argument parser, the program will initialize a semaphore
+-- and mapped memory segment. Then, based on the user arguments (number of processes/threads), it will
+-- calculate how much work each process/thread needs to do. Then it will cleanup and create output the output
+-- directory.
+--
+-- Finally, it will spawn off all of the worker processes/threads, each of which will be writing their result
+-- work into the mapped memory segment once complete. Then the program will output its results and end.
+----------------------------------------------------------------------------------------------------------------------*/
 int main(int argc, char **argv)
 {
     struct arguments arguments;
@@ -10,7 +65,7 @@ int main(int argc, char **argv)
     arguments.output = 1;
 
     // execute argument parser
-    argp_parse (&argp, argc, argv, 0, 0, &arguments);
+    argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
     unsigned long long num_iters = std::stoull(arguments.args[0]);
     unsigned int num_processes = std::stoi(arguments.args[1]);
@@ -39,7 +94,6 @@ int main(int argc, char **argv)
     unsigned long long start_iteration = 0;
 
     bool output = (arguments.output == 1 ? true : false);
-
 
     if (output)
     {
@@ -160,8 +214,6 @@ int main(int argc, char **argv)
     // as the number of discrete workers increase, there is a loss of precision (last 3 decimals)
     // due to the addition done on the global_result variable
 
-    // serial_test();
-
     std::cout
     << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi_result << std::endl;
     std::cout << "actual  pi = " << ACTUAL_PI << std::endl;
@@ -183,6 +235,37 @@ int main(int argc, char **argv)
     return 0;
 }
 
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: approx_pi_t
+--
+-- DATE: January 23 2017
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Spenser Lee
+--
+-- PROGRAMMER: Spenser Lee
+--
+-- INTERFACE: void approx_pi_t(
+                    unsigned long long start,
+                    unsigned long long num_iters,
+                    unsigned long long total_iters,
+                    bool output,
+                    int process,
+                    int thread)
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This is the thread worker function. The important input is the start offset and number of worker iterations.
+--
+-- Each worker is given an offset within the Taylor series, so each worker is a section of 'y':
+-- pi       = 4 * ( 1 - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 ... )
+-- let y    = - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 + 1/13 - 1/15 + 1/17 ...)
+-- let z    = ( 1 + y )
+-- pi       = 4 * z
+-- In this case, 'y' has been named 'global_result'.
+----------------------------------------------------------------------------------------------------------------------*/
 void approx_pi_t(
     unsigned long long start,
     unsigned long long num_iters,
@@ -241,6 +324,36 @@ void approx_pi_t(
     }
 }
 
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: approx_pi
+--
+-- DATE: January 23 2017
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Spenser Lee
+--
+-- PROGRAMMER: Spenser Lee
+--
+-- INTERFACE: void approx_pi(
+                    unsigned long long start,
+                    unsigned long long num_iters,
+                    unsigned long long total_iters,
+                    bool output,
+                    int process)
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This is the process worker function. The important input is the start offset and number of worker iterations.
+--
+-- Each worker is given an offset within the Taylor series, so each worker is a section of 'y':
+-- pi       = 4 * ( 1 - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 ... )
+-- let y    = - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 + 1/13 - 1/15 + 1/17 ...)
+-- let z    = ( 1 + y )
+-- pi       = 4 * z
+-- In this case, 'y' has been named 'global_result'.
+----------------------------------------------------------------------------------------------------------------------*/
 void approx_pi(
     unsigned long long start,
     unsigned long long num_iters,

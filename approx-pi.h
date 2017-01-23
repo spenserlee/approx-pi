@@ -1,3 +1,22 @@
+/*------------------------------------------------------------------------------------------------------------------
+-- SOURCE FILE: approx-pi.h - Header file for program.
+--
+-- PROGRAM: approx-pi
+--
+-- FUNCTIONS:
+--
+-- DATE: January 23, 2017
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Spenser Lee
+--
+-- PROGRAMMER: Spenser Lee
+--
+-- NOTES:
+-- This file contains the header files and definitions for the main program.
+----------------------------------------------------------------------------------------------------------------------*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -22,36 +41,6 @@
 #define ACTUAL_PI "3.14159265358979323846"
 #define SEMAPHORE_NAME "/approx_pi_sem"
 
-// to monitor semaphores
-// watch -n1 ls -al /dev/shm/sem.*|more
-
-/*
-RESOURCES USED
-POSIX semaphore resource
-http://www.frascati.enea.it/documentation/tru6450/ARH9TATE/SMCHPXXX.HTM
-NOTE posix semaphores cannot be path names
-A named semaphore is identified by a name of the form /somename; that is,
-a null-terminated string of up to NAME_MAX-4 (i.e., 251) characters
-consisting of an initial slash, followed by one or more characters,
-none of which are slashes.
-source: https://linux.die.net/man/7/sem_overview
-
-argp resource
-https://www.gnu.org/software/libc/manual/html_node/Argp.html#Argp
-*/
-
-/*
-It is understood that using the Taylor series to approximate pi is very slow,
-this program is simply to compare the speed between processes and threads in a long running task.
-
-https://www.math.hmc.edu/funfacts/ffiles/30001.1-3.shtml
-http://www.geom.uiuc.edu/~huberty/math5337/groupe/expresspi.html?
-*/
-
-    // pi       = 4 * ( 1 - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 ... )
-    // let y    = - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 + 1/13 - 1/15 + 1/17 ...)
-    // let z    = ( 1 + y )
-    // pi       = 4 * z
 static long double *global_result;
 
 void approx_pi_t(
