@@ -22,7 +22,7 @@
 #include <argp.h>
 
 // argp globals
-const char *argp_program_version = "approx-pi 0.1";
+const char *argp_program_version = "approx-pi 1.0";
 static char doc[] = "approx-pi -- a program to compare the performance between\
                     processes and threads, where the busy-work task is to \
                     approximate pi using the Taylor series.";
