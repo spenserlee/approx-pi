@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     // execute argument parser
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-    unsigned long long num_iters = std::stoull(arguments.args[0]);
+    unsigned long long total_iters = std::stoull(arguments.args[0]);
     unsigned int num_processes = std::stoi(arguments.args[1]);
 
     // create named semaphore
@@ -93,13 +93,13 @@ int main(int argc, char **argv)
     // if there are no threaded workers, total workers is just number of processes
     // otherwise its is the product of threads per process
     int total_workers = (arguments.threads == 0 ? num_processes : num_processes * arguments.threads);
-    double iters_per_worker = floor(num_iters / total_workers);
-    unsigned long long remaining_iterations = num_iters - (iters_per_worker * total_workers);
+    double iters_per_worker = floor(total_iters / total_workers);
+    unsigned long long remaining_iterations = total_iters - (iters_per_worker * total_workers);
     unsigned long long start_iteration = 0;
 
     bool output = (arguments.output == 1 ? true : false);
 
-    std::cout << "Total Iterations              = " << num_iters << std::endl
+    std::cout << "Total Iterations              = " << total_iters << std::endl
               << "Total Workers                 = " << total_workers << std::endl
               << "Iterations Per Worker         = " << iters_per_worker << std::endl
               << "Process Workers               = " << num_processes << std::endl
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
             {
                 for (int j = 0; j < arguments.threads; j++)
                 {
-                    threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, num_iters, output, i, j);
+                    threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, total_iters, output, i, j);
                     t_count++;
                     start_iteration += iters_per_worker;
                 }
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                approx_pi(start_iteration, iters_per_worker, num_iters, output, i);
+                approx_pi(start_iteration, iters_per_worker, total_iters, output, i);
             }
             return 0;
         }
@@ -174,18 +174,19 @@ int main(int argc, char **argv)
 
     if (arguments.threads > 0)  // using threads
     {
+        unsigned long long iterations;
         for (int i = 0; i < arguments.threads; i++)
         {
             if (i == arguments.threads-1)
             {
-                num_iters = iters_per_worker + remaining_iterations;
+                iterations = iters_per_worker + remaining_iterations;
             }
             else
             {
-                num_iters = iters_per_worker;
+                iterations = iters_per_worker;
             }
 
-            threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, num_iters, output, num_processes-1, i);
+            threads[t_count] = std::thread(approx_pi_t, start_iteration, iterations, total_iters, output, num_processes-1, i);
             t_count++;
 
             start_iteration += iters_per_worker;
@@ -198,7 +199,7 @@ int main(int argc, char **argv)
     }
     else    // using processes
     {
-        approx_pi(start_iteration, iters_per_worker + remaining_iterations, num_iters, output, num_processes-1);
+        approx_pi(start_iteration, iters_per_worker + remaining_iterations, total_iters, output, num_processes-1);
     }
     sem_close(mysem);
 
