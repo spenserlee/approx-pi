@@ -4,19 +4,33 @@
 #include <unistd.h>
 #include <math.h>
 #include <semaphore.h>
-#include <pthread.h>
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <thread>
 #include <string>
 #include <iostream>
 #include <iomanip>
 #include <limits>
 
 #define ACTUAL_PI "3.14159265358979323846"
-// #define SEMAPHORE_NAME "/tmp/approx_pi_sem"
-#define SEMAPHORE_NAME "approx_pi_sem"
+#define SEMAPHORE_NAME "/approx_pi_sem"
+
+/*
+RESOURCES USED
+POSIX semaphore resource
+http://www.frascati.enea.it/documentation/tru6450/ARH9TATE/SMCHPXXX.HTM
+NOTE posix semaphores cannot be path names
+A named semaphore is identified by a name of the form /somename; that is,
+a null-terminated string of up to NAME_MAX-4 (i.e., 251) characters
+consisting of an initial slash, followed by one or more characters,
+none of which are slashes.
+source: https://linux.die.net/man/7/sem_overview
+
+argp resource
+https://www.gnu.org/software/libc/manual/html_node/Argp.html#Argp
+*/
 
 /*
 It is understood that using the Taylor series to approximate pi is very slow,
@@ -48,20 +62,43 @@ void serial_test(unsigned long long iterations)
         sign *= -1;
     }
 
-    std::cout << std::setprecision(std::numeric_limits<long double>::digits10 + 2)
+    std::cout << std::setprecision(std::numeric_limits<long double>::max_digits10)
      << std::endl << "ssResult  = " << seriesResult << std::endl;
 
     approx_pi = 4 * (1 + seriesResult);
 
-    // std::numeric_limits<long double>::digits10 + 2
-    // is equivalent to
-    // std::numeric_limits<long double>::max_digits10
-    // in c++11
-    // source: http://stackoverflow.com/a/554134
-    std::cout << "sapprox pi = " << std::setprecision(std::numeric_limits<long double>::digits10 + 2) << approx_pi << std::endl;
+    std::cout << "sapprox pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi << std::endl;
 }
 
-void do_work(unsigned long long  start, unsigned long long  num_iterations)
+void do_work_t(unsigned long long start, unsigned long long num_iterations)
+{
+    char sign = (start % 2 == 0) ? -1 : 1;
+
+    long double denominator = 3.0 + (2 * start);
+    long double seriesResult = 0.0;
+
+    for (unsigned long long  i = 0; i < num_iterations; i++)
+    {
+        seriesResult = seriesResult + (sign * (1.0 / denominator));
+        denominator += 2.0;
+        sign *= -1;
+    }
+
+    sem_t *semdes;
+    if ((semdes = sem_open(SEMAPHORE_NAME, 0, 0644, 0)) == (void*) -1)
+    {
+        std::cout << "sem_open() in work failed" << std::endl;
+    }
+
+    // wait until semaphore is available then lock
+    if (!sem_wait(semdes))
+    {
+        *global_result += seriesResult;
+        sem_post(semdes);   // release semaphore lock
+    }
+}
+
+void do_work(unsigned long long start, unsigned long long num_iterations)
 {
     // int iterations = (num_iterations > 1) ? num_iterations-1 : num_iterations;
     char sign = (start % 2 == 0) ? -1 : 1;
@@ -79,7 +116,7 @@ void do_work(unsigned long long  start, unsigned long long  num_iterations)
         denominator += 2.0;
         sign *= -1;
     }
-    // std::cout << std::setprecision(std::numeric_limits<long double>::digits10 + 2)
+    // std::cout << std::setprecision(std::numeric_limits<long double>::max_digits10)
     //  << "sResult  = " << seriesResult << std::endl << std::flush;
 
     sem_t *semdes;
@@ -96,7 +133,6 @@ void do_work(unsigned long long  start, unsigned long long  num_iterations)
         sem_post(semdes);   // release semaphore lock
         sem_close(semdes);  // disassociate the semaphore with this particular process
     }
-
 }
 
 timespec diff(timespec start, timespec end)
@@ -200,7 +236,8 @@ int main(int argc, char **argv)
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
     // TODO: may not be necessary due to argp consuming - for negative args
-    if (std::stoull(arguments.args[0]) < 0 || std::stoi(arguments.args[1]) < 0) {
+    if (std::stoull(arguments.args[0]) < 0 || std::stoi(arguments.args[1]) < 0)
+    {
         std::cout << "NUM_ITERATIONS and NUM_PROCESSES must be a positive value." << std::endl;
         return -1;
     }
@@ -208,20 +245,14 @@ int main(int argc, char **argv)
     unsigned long long num_iters = std::stoull(arguments.args[0]);
     unsigned int num_processes = std::stoi(arguments.args[1]);
 
+    // monitor semaphores
+    // watch -n1 ls -al /dev/shm/sem.*|more
+
     sem_t *mysem;
     if ((mysem = sem_open(SEMAPHORE_NAME, O_CREAT, 0644, 1)) == (void*) -1) {
         std::cout << "sem_open() failed" << std::endl;
         return -2;
     }
-
-    int x;
-
-    if ((sem_getvalue(mysem, &x)) == -1)
-    {
-        std::cout << "sem_getvalue() failed" << std::endl;
-    }
-
-    std::cout << "mysem val = " << x << std::endl;
 
     // printf ("NUM_ITERATIONS = %s\nNUM_PROCESSES = %s\nthreads = %d\nopenmp = %d\noutput = %s\n",
     //         arguments.args[0],
@@ -246,25 +277,51 @@ int main(int argc, char **argv)
     double iters_per_worker = floor(num_iters / total_workers);
     unsigned long long remaining_iterations = num_iters - (iters_per_worker * total_workers);
     unsigned long long start_iteration = 0;
+    std::thread threads[arguments.threads];
+    int t_count = 0;
 
-    pid_t* pids = new pid_t[total_workers-1];
+    pid_t* pids = new pid_t[num_processes-1];
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    for (int i = 0; i < total_workers - 1; i++)
+    for (unsigned int i = 0; i < num_processes - 1; i++)
     {
         pids[i] = fork();
 
         if (pids[i] == 0) // child
         {
-            do_work(start_iteration, iters_per_worker);
+            if (arguments.threads > 0)
+            {
+                for (int j = 0; j < arguments.threads; j++)
+                {
+                    threads[t_count] = std::thread(do_work_t, start_iteration, iters_per_worker);
+                    t_count++;
+                    start_iteration += iters_per_worker;
+                }
+                // join the threads to the child process
+                for (int i = 0; i < arguments.threads; i++)
+                {
+                    threads[i].join();
+                }
+            }
+            else
+            {
+                do_work(start_iteration, iters_per_worker);
+            }
             return 0;
         }
-        else if (pids[i] > 0) // parent
+        else if (pids[i] > 0) // parent process
         {
-            start_iteration += iters_per_worker;
+            if (arguments.threads > 0)
+            {
+                start_iteration += (iters_per_worker * arguments.threads);
+            }
+            else
+            {
+                start_iteration += iters_per_worker;
+            }
         }
-        else
+        else if (pids[i] == -1)
         {
             std::cout << "fork() failed" << std::endl;
             return -1;
@@ -272,12 +329,39 @@ int main(int argc, char **argv)
     }
 
     // parent process does last set of iterations
-    do_work(start_iteration, iters_per_worker + remaining_iterations);
+    if (arguments.threads > 0)
+    {
+        for (int i = 0; i < arguments.threads; i++)
+        {
+            if (i == arguments.threads-1)
+            {
+                num_iters = iters_per_worker + remaining_iterations;
+            }
+            else
+            {
+                num_iters = iters_per_worker;
+            }
+
+            threads[t_count] = std::thread(do_work_t, start_iteration, iters_per_worker);
+            t_count++;
+
+            start_iteration += iters_per_worker;
+        }
+        // join the threads to the parent process
+        for (int i = 0; i < arguments.threads; i++)
+        {
+            threads[i].join();
+        }
+    }
+    else
+    {
+        do_work(start_iteration, iters_per_worker + remaining_iterations);
+    }
     sem_close(mysem);
 
     // force parent to wait for child processes to finish
     // error message if a child fails
-    for (int i = 0; i < total_workers-1; i++)
+    for (unsigned int i = 0; i < num_processes-1; i++)
     {
         int status;
         while (-1 == waitpid(pids[i], &status, 0));
@@ -295,9 +379,13 @@ int main(int argc, char **argv)
 
     clock_gettime(CLOCK_MONOTONIC, &finish);
 
+    // NOTE:
+    // as the number of discrete workers increase, there is a loss of precision (last 3 decimals)
+    // due to the additions done on the global_result variable
+
     // serial_test();
     std::cout << std::endl
-    << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::digits10 + 2) << approx_pi << std::endl;
+    << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi << std::endl;
     std::cout << "actual  pi = " << ACTUAL_PI << std::endl;
 
     std::cout << "elapsed time: " << diff(start,finish).tv_nsec << " ns" << std::endl;
