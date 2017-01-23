@@ -1,5 +1,5 @@
 # makefile
-CXX=g++ -std=c++11 -Wall
+CXX=g++ -std=c++11 -Wall -pthread
 
 all:
 	$(CXX) -g -o approx-pi *.cpp

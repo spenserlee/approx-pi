@@ -3,8 +3,9 @@
 #include <argp.h>
 #include <unistd.h>
 #include <math.h>
-// #include <sys/ipc.h>
-// #include <sys/sem.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <fcntl.h>
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -14,6 +15,8 @@
 #include <limits>
 
 #define ACTUAL_PI "3.14159265358979323846"
+// #define SEMAPHORE_NAME "/tmp/approx_pi_sem"
+#define SEMAPHORE_NAME "approx_pi_sem"
 
 /*
 It is understood that using the Taylor series to approximate pi is very slow,
@@ -79,8 +82,21 @@ void do_work(unsigned long long  start, unsigned long long  num_iterations)
     // std::cout << std::setprecision(std::numeric_limits<long double>::digits10 + 2)
     //  << "sResult  = " << seriesResult << std::endl << std::flush;
 
-    // TODO: may need to implement semaphore
-    *global_result += seriesResult;
+    sem_t *semdes;
+    if ((semdes = sem_open(SEMAPHORE_NAME, 0, 0644, 0)) == (void*) -1)
+    {
+        std::cout << "sem_open() in work failed" << std::endl;
+    }
+
+    // wait until semaphore is available then lock
+    if (!sem_wait(semdes))
+    {
+        *global_result += seriesResult;
+
+        sem_post(semdes);   // release semaphore lock
+        sem_close(semdes);  // disassociate the semaphore with this particular process
+    }
+
 }
 
 timespec diff(timespec start, timespec end)
@@ -192,6 +208,21 @@ int main(int argc, char **argv)
     unsigned long long num_iters = std::stoull(arguments.args[0]);
     unsigned int num_processes = std::stoi(arguments.args[1]);
 
+    sem_t *mysem;
+    if ((mysem = sem_open(SEMAPHORE_NAME, O_CREAT, 0644, 1)) == (void*) -1) {
+        std::cout << "sem_open() failed" << std::endl;
+        return -2;
+    }
+
+    int x;
+
+    if ((sem_getvalue(mysem, &x)) == -1)
+    {
+        std::cout << "sem_getvalue() failed" << std::endl;
+    }
+
+    std::cout << "mysem val = " << x << std::endl;
+
     // printf ("NUM_ITERATIONS = %s\nNUM_PROCESSES = %s\nthreads = %d\nopenmp = %d\noutput = %s\n",
     //         arguments.args[0],
     //         arguments.args[1],
@@ -205,35 +236,6 @@ int main(int argc, char **argv)
                                                 MAP_ANONYMOUS,
                                                 -1, 0);
     *global_result = 0.0;
-
-/*
-    char buf[PATH_MAX];
-    size_t len = ::readlink("/proc/self/exe", buf, sizeof(buf)-1);
-
-    if (len != -1)
-    {
-        buf[len] = '\0';
-    }
-    else
-    {
-        // error
-    }
-
-
-    key_t key;
-    int semid;
-    struct sembuf sb;
-    sb.sem_num = 0;
-    sb.sem_op = -1; // use the resource
-    sb.sem_flg = SEM_UNDO;
-
-    if ((key = ftok(buf, 'A') == -1)
-    {
-        // error msg
-    }
-
-    semid = semget(key, NUM_WORKERS, 0666 | IPC_CREAT);
-*/
 
     timespec start;
     timespec finish;
@@ -271,6 +273,7 @@ int main(int argc, char **argv)
 
     // parent process does last set of iterations
     do_work(start_iteration, iters_per_worker + remaining_iterations);
+    sem_close(mysem);
 
     // force parent to wait for child processes to finish
     // error message if a child fails
@@ -281,7 +284,7 @@ int main(int argc, char **argv)
 
         if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
         {
-            std::cerr << "Process " << i << " (pid " << pids[i] << ") failed" << std::endl;
+            std::cout << "Process " << i << " (pid " << pids[i] << ") failed" << std::endl;
             return -2;
         }
     }
@@ -301,6 +304,9 @@ int main(int argc, char **argv)
 
     // TODO: check for failure
     munmap(global_result, sizeof *global_result);
+
+    sem_unlink(SEMAPHORE_NAME);
+
     delete pids;
 
     return 0;
