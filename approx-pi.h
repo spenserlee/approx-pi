@@ -6,8 +6,11 @@
 #include <math.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <chrono>
 #include <limits>
@@ -53,7 +56,7 @@ static long double *global_result;
 
 void serial_test(unsigned long long iterations);
 
-void approx_pi_t(unsigned long long start, unsigned long long num_iterations);
+void approx_pi_t(unsigned long long start, unsigned long long num_iterations, bool output, int process, int thread);
 
-void approx_pi(unsigned long long start, unsigned long long num_iterations);
+void approx_pi(unsigned long long start, unsigned long long num_iterations, bool output, int process);
 

@@ -38,6 +38,22 @@ int main(int argc, char **argv)
     unsigned long long remaining_iterations = num_iters - (iters_per_worker * total_workers);
     unsigned long long start_iteration = 0;
 
+    bool output = (arguments.output == 1 ? true : false);
+
+
+    if (output)
+    {
+        if (stat("./output", &st) == -1)
+        {
+            mkdir("./output", 0775);
+        }
+        if (stat("./output/results.txt", &st) != -1)
+        {
+            system("exec rm output/worker-output*");
+            system("exec rm output/results.txt");
+        }
+    }
+
     std::thread threads[arguments.threads];
     int t_count = 0;
 
@@ -55,7 +71,7 @@ int main(int argc, char **argv)
             {
                 for (int j = 0; j < arguments.threads; j++)
                 {
-                    threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker);
+                    threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, output, i, j);
                     t_count++;
                     start_iteration += iters_per_worker;
                 }
@@ -67,7 +83,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                approx_pi(start_iteration, iters_per_worker);
+                approx_pi(start_iteration, iters_per_worker, output, i);
             }
             return 0;
         }
@@ -103,7 +119,7 @@ int main(int argc, char **argv)
                 num_iters = iters_per_worker;
             }
 
-            threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker);
+            threads[t_count] = std::thread(approx_pi_t, start_iteration, iters_per_worker, output, num_processes-1, i);
             t_count++;
 
             start_iteration += iters_per_worker;
@@ -116,7 +132,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        approx_pi(start_iteration, iters_per_worker + remaining_iterations);
+        approx_pi(start_iteration, iters_per_worker + remaining_iterations, output, num_processes-1);
     }
     sem_close(mysem);
 
@@ -134,9 +150,9 @@ int main(int argc, char **argv)
         }
     }
 
-    long double approx_pi = 0.0;
+    long double approx_pi_result = 0.0;
 
-    approx_pi = 4 * (1 + *global_result);
+    approx_pi_result = 4 * (1 + *global_result);
 
     std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
 
@@ -145,11 +161,18 @@ int main(int argc, char **argv)
     // due to the addition done on the global_result variable
 
     // serial_test();
-    std::cout << std::endl
-    << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi << std::endl;
+
+    std::cout
+    << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi_result << std::endl;
     std::cout << "actual  pi = " << ACTUAL_PI << std::endl;
 
     auto e_time = std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
+
+    std::ofstream file;
+    file.open("output/results.txt");
+    file << "approx. pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi_result << "\n";
+    file << "elapsed time: " << e_time << " milliseconds\n";
+    file.close();
 
     std::cout << "elapsed time: " << e_time << " milliseconds" << std::endl;
 
@@ -183,17 +206,32 @@ void serial_test(unsigned long long iterations)
     std::cout << "sapprox pi = " << std::setprecision(std::numeric_limits<long double>::max_digits10) << approx_pi << std::endl;
 }
 
-void approx_pi_t(unsigned long long start, unsigned long long num_iterations)
+void approx_pi_t(unsigned long long start, unsigned long long num_iterations, bool output, int process, int thread)
 {
     char sign = (start % 2 == 0) ? -1 : 1;
     long double denominator = 3.0 + (2 * start);
     long double seriesResult = 0.0;
+    std::ofstream file;
+
+    if (output)
+    {
+        std::string file_name = "output/worker-output-p" + std::to_string(process) + "-t" + std::to_string(thread) + ".txt";
+        file.open(file_name);
+    }
 
     for (unsigned long long  i = 0; i < num_iterations; i++)
     {
         seriesResult = seriesResult + (sign * (1.0 / denominator));
+        if (output)
+        {
+            file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+        }
         denominator += 2.0;
         sign *= -1;
+    }
+    if (output)
+    {
+        file.close();
     }
 
     sem_t *semdes;
@@ -210,17 +248,32 @@ void approx_pi_t(unsigned long long start, unsigned long long num_iterations)
     }
 }
 
-void approx_pi(unsigned long long start, unsigned long long num_iterations)
+void approx_pi(unsigned long long start, unsigned long long num_iterations, bool output, int process)
 {
     char sign = (start % 2 == 0) ? -1 : 1;
     long double denominator = 3.0 + (2 * start);
     long double seriesResult = 0.0;
+    std::ofstream file;
+
+    if (output)
+    {
+        std::string file_name = "output/worker-output-p" + std::to_string(process) + ".txt";
+        file.open(file_name);
+    }
 
     for (unsigned long long  i = 0; i < num_iterations; i++)
     {
         seriesResult = seriesResult + (sign * (1.0 / denominator));
+        if (output)
+        {
+            file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
+        }
         denominator += 2.0;
         sign *= -1;
+    }
+    if (output)
+    {
+        file.close();
     }
 
     sem_t *semdes;
