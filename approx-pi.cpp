@@ -93,8 +93,12 @@ int main(int argc, char **argv)
     // if there are no threaded workers, total workers is just number of processes
     // otherwise its is the product of threads per process
     int total_workers = (arguments.threads == 0 ? num_processes : num_processes * arguments.threads);
+
+    // split up the total number of iterations between workers
+    // last worker will do remaining iterations if the distrubution isn't even
     double iters_per_worker = floor(total_iters / total_workers);
-    unsigned long long remaining_iterations = total_iters - (iters_per_worker * total_workers);
+    unsigned long long remaining_iterations = total_iters % total_workers;
+
     unsigned long long start_iteration = 0;
 
     bool output = (arguments.output == 1 ? true : false);
@@ -177,6 +181,7 @@ int main(int argc, char **argv)
         unsigned long long iterations;
         for (int i = 0; i < arguments.threads; i++)
         {
+            // if you are the last worker, also do remaining_iterations
             if (i == arguments.threads-1)
             {
                 iterations = iters_per_worker + remaining_iterations;
@@ -223,6 +228,7 @@ int main(int argc, char **argv)
 
     std::chrono::high_resolution_clock::time_point finish = std::chrono::high_resolution_clock::now();
 
+    // TODO: highlight the correct digits of the approximated Pi
     std::cout << "approx. pi = "
               << std::setprecision(std::numeric_limits<long double>::max_digits10)
               << approx_pi_result
@@ -273,7 +279,7 @@ int main(int argc, char **argv)
 -- This is the thread worker function. The important input is the start offset and number of worker iterations.
 --
 -- Each worker is given an offset within the Taylor series, so each worker is a section of 'y':
--- pi       = 4 * ( 1 - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 ... )
+-- pi      ~= 4 * ( 1 - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 ... )
 -- let y    = - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 + 1/13 - 1/15 + 1/17 ...)
 -- let z    = ( 1 + y )
 -- pi       = 4 * z
@@ -304,7 +310,7 @@ void approx_pi_t(
         if (output)
         {
             if (total_iters > 100000000)    // safeguard to prevent huge output file size
-            {
+            {                               // TODO: switch this to an I/O frequency option
                 if (i % 10000 == 0)
                 {
                    file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
@@ -361,7 +367,7 @@ void approx_pi_t(
 -- This is the process worker function. The important input is the start offset and number of worker iterations.
 --
 -- Each worker is given an offset within the Taylor series, so each worker is a section of 'y':
--- pi       = 4 * ( 1 - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 ... )
+-- pi      ~= 4 * ( 1 - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 ... )
 -- let y    = - 1/3 + 1/5 - 1/7 + 1/9 - 1/11 + 1/13 - 1/15 + 1/17 ...)
 -- let z    = ( 1 + y )
 -- pi       = 4 * z
@@ -391,7 +397,7 @@ void approx_pi(
         if (output)
         {
             if (total_iters > 100000000)    // safeguard to prevent huge output file size
-            {
+            {                               // TODO: switch this to an I/O frequency option
                 if (i % 10000 == 0)
                 {
                    file << "loop " << start + i << " : seriesResult = " << seriesResult << "\n";
