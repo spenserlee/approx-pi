@@ -3,7 +3,7 @@ This project was an exercise to compare the performance between processes and th
 
 My (rather unscientific and not controlled) testing on Linux did not find much of a performance difference between threads and processes for this particular task.
 
-Approx Pi was is written in C++ 11, uses pthreads for thread workers, fork() for processes, and [argp](https://www.gnu.org/software/libc/manual/html_node/Argp.html) for argument parsing. 
+Approx Pi was is written in C++ 11, uses std::threads for thread workers, fork() for processes, and [argp](https://www.gnu.org/software/libc/manual/html_node/Argp.html) for argument parsing. 
 
 ![approx-pi](https://github.com/spenserlee/approx-pi/blob/master/documentation/pics/approx-pi.PNG)
 
