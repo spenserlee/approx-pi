@@ -43,5 +43,6 @@ will run 1000 total iterations across **1 process which has 4 threads of executi
 
 
 ## Todo
+ - Arbitrary length precision (probably would take too long or a lot of cores anyways...)
  - Simplify giant comments
  - Compare with an [OpenMP](https://bisqwit.iki.fi/story/howto/openmp/#IntroductionToOpenmpInC) implementation
