@@ -8,18 +8,18 @@ Approx Pi was is written in C++ 11, uses pthreads for thread workers, fork() for
 ![approx-pi](https://github.com/spenserlee/approx-pi/blob/master/documentation/pics/approx-pi.PNG)
 
 ## Directory Contents
-	├── documentation
-	├── pics/
-	│   ├── Design.pdf
-	│   ├── Report.pdf
-	│   └── Testing.pdf
-	├── src
-	│   ├── approx-pi.cpp
-	│   ├── approx-pi.h
-	│   ├── makefile
-	│   └── utils.h
-	├── .gitignore
-	└── README.md
+	  ├── documentation
+	  │   ├── pics/
+	  │   ├── Design.pdf
+	  │   ├── Report.pdf
+	  │   └── Testing.pdf
+	  ├── src
+	  │   ├── approx-pi.cpp
+	  │   ├── approx-pi.h
+	  │   ├── makefile
+	  │   └── utils.h
+	  ├── .gitignore
+	  └── README.md
 
 ## Running
 Compile the program by navigating to the src folder and running `make`.
